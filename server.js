@@ -178,7 +178,7 @@ console.log(
 let mySeq = 0;
 
 const seenPeers = new Map();
-const MAX_PEERS = 10000;
+const MAX_PEERS = 1000; // Reduced from 10000 for memory efficiency
 
 const sseClients = new Set();
 
@@ -269,19 +269,18 @@ function handleMessage(msg, sourceSocket) {
     // 3. Verify Signature
     if (!sig) return;
     try {
-      let key;
-      if (stored && stored.key) {
-        key = stored.key;
-      } else {
-        // Enforce MAX_PEERS for new peers
-        if (!stored && seenPeers.size >= MAX_PEERS) return;
+      // Enforce MAX_PEERS for new peers
+      if (!stored && seenPeers.size >= MAX_PEERS) return;
 
-        key = crypto.createPublicKey({
-          key: Buffer.from(id, "hex"),
-          format: "der",
-          type: "spki",
-        });
-      }
+      // Get or create the raw DER buffer (lightweight storage)
+      const keyDer = stored?.keyDer || Buffer.from(id, "hex");
+      
+      // Parse KeyObject on-demand for verification only (not stored)
+      const key = crypto.createPublicKey({
+        key: keyDer,
+        format: "der",
+        type: "spki",
+      });
 
       const verified = crypto.verify(
         null,
@@ -304,7 +303,9 @@ function handleMessage(msg, sourceSocket) {
       const now = Date.now();
       const wasNew = !stored;
       
-      seenPeers.set(id, { seq, lastSeen: now, key });
+      // Store raw DER buffer instead of heavy KeyObject (~100 bytes vs ~2-5KB)
+      // Note: seenPeers is capped at MAX_PEERS, but peerCounter tracks all
+      seenPeers.set(id, { seq, lastSeen: now, keyDer });
 
       if (wasNew || countChanged) broadcastUpdate();
 
