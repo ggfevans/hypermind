@@ -38,7 +38,13 @@ const sseClients = new Set();
 
 seenPeers.set(MY_ID, { seq: mySeq, lastSeen: Date.now() });
 
+// Throttle updates to once per second
+let lastBroadcast = 0;
 function broadcastUpdate() {
+  const now = Date.now();
+  if (now - lastBroadcast < 1000) return;
+  lastBroadcast = now;
+
   const data = JSON.stringify({
     count: seenPeers.size,
     direct: swarm.connections.size,
@@ -319,13 +325,17 @@ app.get("/", (req, res) => {
                 }
 
                 function updateParticles(count) {
+                    // Limit visual particles to 500 to prevent browser crash
+                    const VISUAL_LIMIT = 500;
+                    const visualCount = Math.min(count, VISUAL_LIMIT);
+                    
                     const currentCount = particles.length;
-                    if (count > currentCount) {
-                        for (let i = 0; i < count - currentCount; i++) {
+                    if (visualCount > currentCount) {
+                        for (let i = 0; i < visualCount - currentCount; i++) {
                             particles.push(new Particle());
                         }
-                    } else if (count < currentCount) {
-                        particles.splice(count, currentCount - count);
+                    } else if (visualCount < currentCount) {
+                        particles.splice(visualCount, currentCount - visualCount);
                     }
                 }
                 
