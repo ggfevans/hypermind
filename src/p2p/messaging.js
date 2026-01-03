@@ -62,7 +62,15 @@ class MessageHandler {
                 sourceSocket.peerId = id;
             }
 
-            const wasNew = this.peerManager.addOrUpdatePeer(id, seq);
+            const getIp = (sock) => {
+                if (sock.remoteAddress) return sock.remoteAddress;
+                if (sock.rawStream && sock.rawStream.remoteHost) return sock.rawStream.remoteHost;
+                if (sock.rawStream && sock.rawStream.remoteAddress) return sock.rawStream.remoteAddress;
+                return null;
+            };
+
+            const ip = (hops === 0) ? getIp(sourceSocket) : null;
+            const wasNew = this.peerManager.addOrUpdatePeer(id, seq, key, ip);
 
             if (wasNew) {
                 this.diagnostics.increment("newPeersAdded");

@@ -96,15 +96,144 @@ document.getElementById('diagnosticsModal').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeDiagnostics();
+        closeMap();
     }
 });
+
+// Map Logic
+let map = null;
+let mapInitialized = false;
+let peerMarkers = {}; // id -> marker
+let ipCache = {}; // ip -> { lat, lon }
+let lastPeerData = [];
+
+const openMap = () => {
+    document.getElementById('mapModal').classList.add('active');
+    if (!mapInitialized) {
+        initMap();
+    } else {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+    }
+    if (lastPeerData.length > 0) {
+        updateMap(lastPeerData);
+    }
+}
+
+const closeMap = () => {
+    document.getElementById('mapModal').classList.remove('active');
+}
+
+document.getElementById('mapModal').addEventListener('click', (e) => {
+    if (e.target.id === 'mapModal') {
+        closeMap();
+    }
+});
+
+const initMap = () => {
+    if (mapInitialized) return;
+    
+    map = L.map('map').setView([20, 0], 2);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+    
+    mapInitialized = true;
+    
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
+}
+
+const fetchLocation = async (ip) => {
+    if (ipCache[ip]) return ipCache[ip];
+    
+    // Skip local IPs
+    if (ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.16.')) {
+        return null;
+    }
+
+    try {
+        const res = await fetch(`https://ipwho.is/${ip}`);
+        const data = await res.json();
+        if (data.success) {
+            const loc = { lat: data.latitude, lon: data.longitude, city: data.city, country: data.country };
+            ipCache[ip] = loc;
+            return loc;
+        }
+    } catch (e) {
+        console.error('Geo fetch failed', e);
+    }
+    return null;
+}
+
+const updateMap = async (peers) => {
+    if (!mapInitialized || !peers) return;
+    
+    const currentIds = new Set(peers.map(p => p.id));
+    
+    // Remove old markers
+    for (const id in peerMarkers) {
+        if (!currentIds.has(id)) {
+            map.removeLayer(peerMarkers[id]);
+            delete peerMarkers[id];
+        }
+    }
+    
+    // Add/Update markers
+    for (const peer of peers) {
+        if (!peer.ip) continue;
+        
+        if (!peerMarkers[peer.id]) {
+            const loc = await fetchLocation(peer.ip);
+            if (loc) {
+                const marker = L.circleMarker([loc.lat, loc.lon], {
+                    radius: 5,
+                    fillColor: "#4ade80",
+                    color: "#fff",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+                
+                marker.bindPopup(`<b>Node</b> ${peer.id.slice(-8)}<br>${loc.city}, ${loc.country}`);
+                peerMarkers[peer.id] = marker;
+            }
+        }
+    }
+}
 
 const terminal = document.getElementById('terminal');
 const terminalOutput = document.getElementById('terminal-output');
 const terminalInput = document.getElementById('terminal-input');
+const terminalToggle = document.getElementById('terminal-toggle');
 const promptEl = document.querySelector('.prompt');
 let myId = null;
 let myChatHistory = [];
+
+terminalToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleChat();
+});
+
+const toggleChat = () => {
+    terminal.classList.toggle('collapsed');
+    const isCollapsed = terminal.classList.contains('collapsed');
+    terminalToggle.innerText = isCollapsed ? '▲' : '▼';
+    
+    if (isCollapsed) {
+        document.body.classList.remove('chat-active');
+        document.body.classList.add('chat-collapsed');
+    } else {
+        document.body.classList.add('chat-active');
+        document.body.classList.remove('chat-collapsed');
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+}
 
 const updatePromptStatus = () => {
     const now = Date.now();
@@ -199,13 +328,25 @@ evtSource.onmessage = (event) => {
 
     if (data.chatEnabled) {
         terminal.classList.remove('hidden');
-        document.body.classList.add('chat-active');
+        if (terminal.classList.contains('collapsed')) {
+            document.body.classList.add('chat-collapsed');
+        } else {
+            document.body.classList.add('chat-active');
+        }
     } else {
         terminal.classList.add('hidden');
         document.body.classList.remove('chat-active');
+        document.body.classList.remove('chat-collapsed');
     }
     
     if (data.id) myId = data.id;
+
+    if (data.peers) {
+        lastPeerData = data.peers;
+        if (mapInitialized && document.getElementById('mapModal').classList.contains('active')) {
+            updateMap(data.peers);
+        }
+    }
 
     updateParticles(data.count);
 

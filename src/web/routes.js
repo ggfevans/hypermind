@@ -37,7 +37,8 @@ const setupRoutes = (app, identity, peerManager, swarm, sseManager, diagnostics)
             direct: swarm.getSwarm().connections.size,
             id: identity.id,
             diagnostics: diagnostics.getStats(),
-            chatEnabled: ENABLE_CHAT
+            chatEnabled: ENABLE_CHAT,
+            peers: peerManager.getPeersWithIps()
         });
         res.write(`data: ${data}\n\n`);
 
@@ -53,7 +54,8 @@ const setupRoutes = (app, identity, peerManager, swarm, sseManager, diagnostics)
             direct: swarm.getSwarm().connections.size,
             id: identity.id,
             diagnostics: diagnostics.getStats(),
-            chatEnabled: ENABLE_CHAT
+            chatEnabled: ENABLE_CHAT,
+            peers: peerManager.getPeersWithIps()
         });
     });
 
