@@ -1,24 +1,31 @@
 :root {
-    --color-primary: #ff6b6b;
-    --color-particle-link: rgba(255, 107, 107, 0.15);
+    --color-count: #f7768e;
+    --color-particle: #ff9e64;
+    --color-particle-link: rgba(255, 157, 100, 0.15);
     --color-pulse: #fff;
-    --color-theme-toggle: #ff6b6b;
+    --color-theme-toggle: #f7768e;
     --color-theme-toggle-hover: #fff;
 
-
     --color-text-default: #eee;
-    --color-text-primary: #f7d794;
-    --color-text-secondary: #ff92a1;
-    --color-text-tertiary: #ff92a1;
+    --color-text-secondary: #9aa5ce;
+    --color-text-main-label: #bb9af7; 
+    --color-text-footer: #9aa5ce;
+    --color-text-footer-hover: #bb9af7;
+    --color-text-debug: #9aa5ce;
+    --color-text-debug-link: #9aa5ce;
+    --color-text-debug-link-hover: #bb9af7;
 
-    --color-bg-main: #00172e;
-    --color-bg-overlay: rgba(0, 1, 2, 0.8);
+    --color-bg-overlay: rgba(0, 0, 0, 0.8);
+    --color-bg-main: #1a1b26;
 
-    --color-border-light: #222;
-
-    --color-modal-close-btn: #ff92a1;
-    --color-modal-close-btn-hover: #f7d794;
-    --color-modal-stats-border: #ff92a1;
-    --color-modal-footer: #2d3436;
+    --color-modal-bg: #1a1b26;
+    --color-modal-border: #414868;
+    --color-modal-title: #f7768e;
+    --color-modal-close-btn: #414868;
+    --color-modal-close-btn-hover: #bb9af7;
+    --color-modal-stat-div: #414868;
+    --color-modal-stat-label: #bb9af7;
+    --color-modal-stat-value: #ff9e64;
+    --color-modal-footer: #414868;
 
 }

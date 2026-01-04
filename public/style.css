@@ -85,7 +85,7 @@ a { color: var(--color-text-secondary); text-decoration: none; border-bottom: 1p
 .stat-row:last-child { border-bottom: none; }
 .stat-label { color: var(--color-modal-stat-label); }
 .stat-value { 
-    color: var(--color-modal-stat-value;);
+    color: var(--color-modal-stat-value);
     font-variant-numeric: tabular-nums;
 }
 .update-time {
