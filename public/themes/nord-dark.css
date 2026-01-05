@@ -1,0 +1,31 @@
+:root {
+    --color-count: #88c0d0;
+    --color-particle: #8fbcbb;
+    --color-particle-link: rgba(143, 188, 187, 0.15);
+    --color-pulse: #eceff4;
+    --color-theme-toggle: #88c0d0;
+    --color-theme-toggle-hover: #eceff4;
+
+    --color-text-default: #eee;
+    --color-text-secondary: #81a1c1;
+    --color-text-main-label: #5e81ac; 
+    --color-text-footer: #81a1c1;
+    --color-text-footer-hover: #5e81ac;
+    --color-text-debug: #81a1c1;
+    --color-text-debug-link: #81a1c1;
+    --color-text-debug-link-hover: #5e81ac;
+
+    --color-bg-overlay: rgba(46, 52, 64, 0.8);
+    --color-bg-main: #2e3440;
+
+    --color-modal-bg: #2e3440;
+    --color-modal-border: #434c5e;
+    --color-modal-title: #88c0d0;
+    --color-modal-close-btn: #434c5e;
+    --color-modal-close-btn-hover: #5e81ac;
+    --color-modal-stat-div: #434c5e;
+    --color-modal-stat-label: #5e81ac;
+    --color-modal-stat-value: #8fbcbb;
+    --color-modal-footer: #434c5e;
+
+}

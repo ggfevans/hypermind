@@ -160,7 +160,10 @@ animate();
 
 const themes = [
     'default.css',
-    'tokyo-night.css'
+    'tokyo-night.css',
+    'nord-dark.css',
+    'solarized-light.css',
+    'volcano.css'
 ];
 
 let currentThemeIndex = 0;
