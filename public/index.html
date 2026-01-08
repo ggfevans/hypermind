@@ -27,6 +27,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/js/lists.js"></script>
     <script src="/js/screenname.js"></script>
+    <script src="/js/commands.js"></script>
   </head>
   <body>
     <canvas id="network" data-visual-limit="{{VISUAL_LIMIT}}"></canvas>
@@ -133,6 +134,7 @@
       <span class="material-symbols-outlined">palette</span>
     </button>
     <div id="terminal" class="terminal hidden">
+      <div id="terminal-resizer" class="terminal-resizer"></div>
       <button id="terminal-toggle" class="terminal-toggle" title="Toggle Chat">
         ▼
       </button>
@@ -148,6 +150,11 @@
           autocomplete="off"
         />
       </div>
+    </div>
+
+    <div id="contextMenu" class="context-menu">
+      <div class="context-menu-item" id="contextWhisper">Whisper</div>
+      <div class="context-menu-item" id="contextBlock">Block</div>
     </div>
 
     <script src="/app.js"></script>

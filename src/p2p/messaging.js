@@ -4,7 +4,11 @@ const {
   createPublicKey,
 } = require("../core/security");
 const crypto = require("crypto");
-const { MAX_RELAY_HOPS, ENABLE_CHAT, CHAT_RATE_LIMIT } = require("../config/constants");
+const {
+  MAX_RELAY_HOPS,
+  ENABLE_CHAT,
+  CHAT_RATE_LIMIT,
+} = require("../config/constants");
 const { BloomFilterManager } = require("../state/bloom");
 const { generateScreenname } = require("../utils/name-generator");
 
@@ -46,7 +50,6 @@ class MessageHandler {
     this.diagnostics.increment("heartbeatsReceived");
     const { id, seq, hops, nonce, sig } = msg;
 
-    // Optimization: Check for duplicates BEFORE verifyPoW (CPU intensive)
     const stored = this.peerManager.getPeer(id);
     if (stored && seq <= stored.seq) {
       this.diagnostics.increment("duplicateSeq");
@@ -61,10 +64,8 @@ class MessageHandler {
     if (!sig) return;
 
     try {
-      // Check if we can accept new peers (only matters for new peers)
       if (!stored && !this.peerManager.canAcceptPeer(id)) return;
 
-      // Derive public key on-demand from peer ID
       const key = createPublicKey(id);
 
       if (!verifySignature(`seq:${seq}`, sig, key)) {
@@ -94,13 +95,14 @@ class MessageHandler {
         if (ENABLE_CHAT && this.chatSystemFn && hops === 0) {
           this.chatSystemFn({
             type: "SYSTEM",
-            content: `Connection established with Node [${generateScreenname(id)}]`,
+            content: `Connection established with Node [${generateScreenname(
+              id
+            )}]`,
             timestamp: Date.now(),
           });
         }
       }
 
-      // Only relay if we haven't already relayed this message (bloom filter check)
       if (hops < MAX_RELAY_HOPS && !this.bloomFilter.hasRelayed(id, seq)) {
         this.bloomFilter.markRelayed(id, seq);
         this.diagnostics.increment("heartbeatsRelayed");
@@ -117,10 +119,8 @@ class MessageHandler {
 
     if (!sig) return;
 
-    // Only process leave messages for peers we know about
     if (!this.peerManager.hasPeer(id)) return;
 
-    // Derive public key on-demand from peer ID
     const key = createPublicKey(id);
 
     if (!verifySignature(`type:LEAVE:${id}`, sig, key)) {
@@ -140,7 +140,6 @@ class MessageHandler {
         });
       }
 
-      // Use id:leave as key for LEAVE messages
       if (hops < MAX_RELAY_HOPS && !this.bloomFilter.hasRelayed(id, "leave")) {
         this.bloomFilter.markRelayed(id, "leave");
         this.relayCallback({ ...msg, hops: hops + 1 }, sourceSocket);
@@ -151,74 +150,67 @@ class MessageHandler {
   handleChat(msg, sourceSocket) {
     const { scope, sender, id, sig, hops } = msg;
 
-    // Rate Limiting (apply to all chat messages)
     const now = Date.now();
     let rateData = this.chatRateLimits.get(sender);
-    
+
     if (!rateData || now - rateData.windowStart > 10000) {
-        // Reset window
-        rateData = { count: 0, windowStart: now };
+      rateData = { count: 0, windowStart: now };
     }
 
     if (rateData.count >= 5) {
-        return; // Drop message
+      return;
     }
 
-    if (!scope || scope === 'LOCAL') {
-        // Identity Verification: Ensure the sender matches the authenticated socket
-        if (!sourceSocket.peerId || sourceSocket.peerId !== sender) {
-            return;
-        }
+    if (!scope || scope === "LOCAL") {
+      if (!sourceSocket.peerId || sourceSocket.peerId !== sender) {
+        return;
+      }
 
-        rateData.count++;
-        this.chatRateLimits.set(sender, rateData);
+      rateData.count++;
+      this.chatRateLimits.set(sender, rateData);
 
-        if (this.chatCallback) {
-            this.chatCallback(msg);
-        }
-    } else if (scope === 'GLOBAL') {
-        if (!sig || !id) return;
+      if (this.chatCallback) {
+        this.chatCallback(msg);
+      }
+    } else if (scope === "GLOBAL") {
+      if (!sig || !id) return;
 
-        // Integrity Check: Ensure ID matches content/timestamp
-        // This binds the signature (which signs ID) to the content
-        const idBase = sender + msg.content + msg.timestamp;
-        const computedId = crypto.createHash('sha256').update(idBase).digest('hex');
-        
-        if (computedId !== id) {
-            this.diagnostics.increment("invalidSig"); // Reuse metric for integrity failure
-            return;
-        }
+      const idBase = sender + msg.content + msg.timestamp;
+      const computedId = crypto
+        .createHash("sha256")
+        .update(idBase)
+        .digest("hex");
 
-        // Timestamp Check: Prevent replays beyond Bloom filter window
-        // Allow 1 minute drift/delay
-        if (Math.abs(now - msg.timestamp) > 60000) {
-             return; 
-        }
+      if (computedId !== id) {
+        this.diagnostics.increment("invalidSig");
+        return;
+      }
 
-        // Check signature
-        const key = createPublicKey(sender);
-        if (!verifySignature(`chat:${id}`, sig, key)) {
-            this.diagnostics.increment("invalidSig");
-            return;
-        }
+      if (Math.abs(now - msg.timestamp) > 60000) {
+        return;
+      }
 
-        // Deduplication
-        if (this.bloomFilter.hasRelayed(id, "chat")) {
-            return;
-        }
-        this.bloomFilter.markRelayed(id, "chat");
+      const key = createPublicKey(sender);
+      if (!verifySignature(`chat:${id}`, sig, key)) {
+        this.diagnostics.increment("invalidSig");
+        return;
+      }
 
-        rateData.count++;
-        this.chatRateLimits.set(sender, rateData);
+      if (this.bloomFilter.hasRelayed(id, "chat")) {
+        return;
+      }
+      this.bloomFilter.markRelayed(id, "chat");
 
-        if (this.chatCallback) {
-            this.chatCallback(msg);
-        }
+      rateData.count++;
+      this.chatRateLimits.set(sender, rateData);
 
-        // Relay
-        if (hops < MAX_RELAY_HOPS) {
-            this.relayCallback({ ...msg, hops: hops + 1 }, sourceSocket);
-        }
+      if (this.chatCallback) {
+        this.chatCallback(msg);
+      }
+
+      if (hops < MAX_RELAY_HOPS) {
+        this.relayCallback({ ...msg, hops: hops + 1 }, sourceSocket);
+      }
     }
   }
 }
@@ -255,12 +247,26 @@ const validateMessage = (msg) => {
   }
 
   if (msg.type === "CHAT") {
-    const allowedFields = ['type', 'sender', 'content', 'timestamp', 'scope', 'id', 'sig', 'hops'];
+    const allowedFields = [
+      "type",
+      "sender",
+      "content",
+      "timestamp",
+      "scope",
+      "id",
+      "sig",
+      "hops",
+      "target",
+    ];
     const fields = Object.keys(msg);
-    return fields.every(f => allowedFields.includes(f)) &&
-        msg.sender && 
-        msg.content && typeof msg.content === 'string' && msg.content.length <= 140 &&
-        typeof msg.timestamp === 'number';
+    return (
+      fields.every((f) => allowedFields.includes(f)) &&
+      msg.sender &&
+      msg.content &&
+      typeof msg.content === "string" &&
+      msg.content.length <= 140 &&
+      typeof msg.timestamp === "number"
+    );
   }
 
   return false;
