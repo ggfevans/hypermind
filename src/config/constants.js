@@ -23,6 +23,7 @@ const path = require("path");
 
 const ENABLE_CHAT = process.env.ENABLE_CHAT === "true";
 const ENABLE_MAP = process.env.ENABLE_MAP === "true";
+const ENABLE_GLOBE = process.env.ENABLE_GLOBE === "true";
 const ENABLE_THEMES = process.env.ENABLE_THEMES !== "false";
 const VISUAL_LIMIT = parseInt(process.env.VISUAL_LIMIT) || 500;
 const CHAT_RATE_LIMIT = parseInt(process.env.CHAT_RATE_LIMIT) || 5000;
@@ -73,6 +74,7 @@ module.exports = {
   PORT,
   ENABLE_CHAT,
   ENABLE_MAP,
+  ENABLE_GLOBE,
   ENABLE_THEMES,
   CHAT_RATE_LIMIT,
   VISUAL_LIMIT,
