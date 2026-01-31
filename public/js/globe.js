@@ -149,6 +149,18 @@ const Globe = (function() {
         cancelAnimationFrame(animationId);
         animationId = null;
       }
+      if (globe) {
+        globe.geometry.dispose();
+        globe.material.dispose();
+        globe = null;
+      }
+      if (graticule) {
+        graticule.traverse((child) => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) child.material.dispose();
+        });
+        graticule = null;
+      }
       if (renderer) {
         renderer.dispose();
         if (container && renderer.domElement) {
@@ -158,8 +170,7 @@ const Globe = (function() {
       }
       scene = null;
       camera = null;
-      globe = null;
-      graticule = null;
+      container = null;
       isInitialized = false;
       console.log('[Globe] Destroyed');
     },
