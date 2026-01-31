@@ -30,6 +30,7 @@ const Globe = (function() {
   let container = null;
   let animationId = null;
   let isInitialized = false;
+  let statsOverlay = null;
 
   // Peer data
   let peerData = [];
@@ -189,6 +190,32 @@ const Globe = (function() {
     }
   }
 
+  // Create stats overlay
+  function createStatsOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'globe-stats';
+    overlay.style.cssText = `
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      color: var(--color-text-default);
+      font-family: inherit;
+      font-size: 14px;
+      pointer-events: none;
+      text-shadow: 0 0 4px var(--color-bg-main);
+    `;
+    overlay.innerHTML = '<span id="globe-peer-count">0</span> peers';
+    return overlay;
+  }
+
+  // Update stats display
+  function updateStats() {
+    const countEl = document.getElementById('globe-peer-count');
+    if (countEl) {
+      countEl.textContent = peerData.length.toLocaleString();
+    }
+  }
+
   // Public API
   return {
     init: function(containerId) {
@@ -215,6 +242,11 @@ const Globe = (function() {
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(renderer.domElement);
+
+      // Create stats overlay
+      statsOverlay = createStatsOverlay();
+      container.style.position = 'relative';
+      container.appendChild(statsOverlay);
 
       // Create orbit controls
       controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -323,6 +355,10 @@ const Globe = (function() {
       if (isInitialized && peerPoints) {
         updatePeerPointPositions();
       }
+
+      if (isInitialized) {
+        updateStats();
+      }
     },
 
     setMyLocation: function(lat, lng) {
@@ -333,6 +369,10 @@ const Globe = (function() {
     },
 
     destroy: function() {
+      if (statsOverlay && container) {
+        container.removeChild(statsOverlay);
+        statsOverlay = null;
+      }
       if (animationId) {
         cancelAnimationFrame(animationId);
         animationId = null;
