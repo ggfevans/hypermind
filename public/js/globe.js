@@ -98,6 +98,8 @@ const Globe = (function() {
       group.add(new THREE.Line(geometry, material));
     }
 
+    group.userData.sharedMaterial = material;
+
     return group;
   }
 
@@ -223,7 +225,7 @@ const Globe = (function() {
       container = document.getElementById(containerId);
       if (!container) {
         console.error('[Globe] Container not found:', containerId);
-        return;
+        return false;
       }
 
       const width = container.clientWidth;
@@ -341,6 +343,7 @@ const Globe = (function() {
 
       isInitialized = true;
       console.log('[Globe] Initialized successfully');
+      return true;
     },
 
     updatePeers: function(peers) {
@@ -403,9 +406,12 @@ const Globe = (function() {
         globe = null;
       }
       if (graticule) {
+        if (graticule.userData.sharedMaterial) {
+          graticule.userData.sharedMaterial.dispose();
+        }
         graticule.traverse((child) => {
           if (child.geometry) child.geometry.dispose();
-          if (child.material) child.material.dispose();
+          // Don't dispose material here - already disposed above
         });
         graticule = null;
       }

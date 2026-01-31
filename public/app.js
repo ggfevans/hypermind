@@ -149,6 +149,7 @@ const fetchMyLocation = async () => {
 
 const openMap = () => {
   document.getElementById("mapModal").classList.add("active");
+  mapOpen = true;
   if (!mapInitialized) {
     initMap();
   } else {
@@ -189,6 +190,10 @@ function closeMap() {
 }
 
 function toggleGlobeView() {
+  if (typeof Globe === 'undefined') {
+    console.error('[Globe] Globe module not loaded');
+    return;
+  }
   globeViewActive = !globeViewActive;
   const mapDiv = document.getElementById('map');
   const globeDiv = document.getElementById('globe-container');

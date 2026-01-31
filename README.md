@@ -152,6 +152,7 @@ Hypermind is highly configurable. Use these variables to tune your experience.
 |----------|---------|-------------|
 | `ENABLE_CHAT` | `false` | Set to `true` to enable the P2P chat system. |
 | `ENABLE_MAP` | `false` | Set to `true` to enable the map visualization. |
+| `ENABLE_GLOBE` | `false` | Set to `true` to enable the 3D globe visualization. |
 | `ENABLE_THEMES` | `true` | Set to `false` to disable the theme switcher. |
 | `VISUAL_LIMIT` | `500` | Max number of particles to render on the dashboard. |
 
