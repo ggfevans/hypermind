@@ -8,6 +8,21 @@ const Globe = (function() {
   const GLOBE_RADIUS = 100;
   const MAX_VISIBLE_PEERS = 5000;
 
+  // Performance: only process peers in visible hemisphere
+  function filterVisiblePeers(peers, cameraPosition) {
+    if (!cameraPosition) return peers;
+
+    const cameraDir = cameraPosition.clone().normalize();
+
+    return peers.filter(peer => {
+      if (peer.lat === undefined || peer.lng === undefined) return false;
+      const peerPos = latLngToVector3(peer.lat, peer.lng, 1).normalize();
+      // Dot product > 0 means facing camera (visible hemisphere)
+      // Use -0.2 to include slightly beyond equator
+      return cameraDir.dot(peerPos) > -0.2;
+    });
+  }
+
   // Three.js objects
   let scene, camera, renderer, controls;
   let globe, graticule, peerPoints;
@@ -106,14 +121,15 @@ const Globe = (function() {
   function updatePeerPointPositions() {
     if (!peerPoints || peerData.length === 0) return;
 
+    // Filter to visible hemisphere for better performance
+    const visiblePeers = camera ? filterVisiblePeers(peerData, camera.position) : peerData;
+
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     let visibleCount = 0;
 
-    for (let i = 0; i < peerData.length && i < MAX_VISIBLE_PEERS; i++) {
-      const peer = peerData[i];
-      if (peer.lat === undefined || peer.lng === undefined) continue;
-
+    for (let i = 0; i < visiblePeers.length && i < MAX_VISIBLE_PEERS; i++) {
+      const peer = visiblePeers[i];
       position.copy(latLngToVector3(peer.lat, peer.lng, GLOBE_RADIUS * 1.02));
       matrix.setPosition(position);
       peerPoints.setMatrixAt(visibleCount, matrix);
@@ -239,10 +255,23 @@ const Globe = (function() {
       container.addEventListener('mouseenter', this._mouseEnterHandler);
       container.addEventListener('mouseleave', this._mouseLeaveHandler);
 
+      let lastCameraPos = new THREE.Vector3();
+      let updateThrottle = 0;
+
       function animate() {
         animationId = requestAnimationFrame(animate);
         controls.autoRotate = !isHovering;
         controls.update();
+
+        // Throttled update when camera moves significantly
+        updateThrottle++;
+        if (updateThrottle % 30 === 0) { // Every ~0.5 seconds at 60fps
+          if (!camera.position.equals(lastCameraPos)) {
+            lastCameraPos.copy(camera.position);
+            updatePeerPointPositions();
+          }
+        }
+
         renderer.render(scene, camera);
       }
       animate();
