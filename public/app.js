@@ -121,6 +121,7 @@ let peerMarkers = {}; // id -> marker
 let ipCache = {}; // ip -> { lat, lon }
 let lastPeerData = [];
 let myLocation = null;
+let globeViewActive = false;
 
 const fetchMyLocation = async () => {
   if (myLocation) return;
@@ -134,6 +135,10 @@ const fetchMyLocation = async () => {
         city: data.city,
         country: data.country,
       };
+      // Update globe if active
+      if (globeViewActive && Globe.isReady()) {
+        Globe.setMyLocation(myLocation.lat, myLocation.lon);
+      }
       updateMap(lastPeerData);
     }
   } catch (e) {
@@ -161,6 +166,39 @@ const openMap = () => {
 const closeMap = () => {
   document.getElementById("mapModal").classList.remove("active");
 };
+
+function toggleGlobeView() {
+  globeViewActive = !globeViewActive;
+  const mapDiv = document.getElementById('map');
+  const globeDiv = document.getElementById('globe-container');
+  const toggleBtn = document.querySelector('#map-view-toggle button');
+
+  if (globeViewActive) {
+    // Show globe
+    mapDiv.style.display = 'none';
+    globeDiv.style.display = 'block';
+    toggleBtn.textContent = '2D Map';
+
+    if (!Globe.isReady()) {
+      Globe.init('globe-container');
+    }
+
+    // Transfer current peer data to globe
+    if (lastPeerData) {
+      Globe.updatePeers(lastPeerData);
+    }
+    if (myLocation && myLocation.lat && myLocation.lon) {
+      Globe.setMyLocation(myLocation.lat, myLocation.lon);
+    }
+  } else {
+    // Show map
+    mapDiv.style.display = 'block';
+    globeDiv.style.display = 'none';
+    toggleBtn.textContent = '3D Globe';
+  }
+}
+
+window.toggleGlobeView = toggleGlobeView;
 
 document.getElementById("mapModal").addEventListener("click", (e) => {
   if (e.target.id === "mapModal") {
@@ -257,6 +295,18 @@ const updateMap = async (peers) => {
         peerMarkers[peer.id] = marker;
       }
     }
+  }
+
+  // Store enriched peer data for globe
+  lastPeerData = peers.map(p => ({
+    id: p.id,
+    lat: ipCache[p.ip]?.lat,
+    lng: ipCache[p.ip]?.lon
+  })).filter(p => p.lat && p.lng);
+
+  // Update globe if active
+  if (globeViewActive && Globe.isReady()) {
+    Globe.updatePeers(lastPeerData);
   }
 
   // Add My Location
