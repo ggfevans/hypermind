@@ -11,6 +11,7 @@ const Globe = (function() {
   // Three.js objects
   let scene, camera, renderer, controls;
   let globe, graticule, peerPoints;
+  let myLocationMarker = null;
   let container = null;
   let animationId = null;
   let isInitialized = false;
@@ -123,6 +124,26 @@ const Globe = (function() {
     peerPoints.instanceMatrix.needsUpdate = true;
   }
 
+  // Create marker for user's location
+  function createMyLocationMarker() {
+    const geometry = new THREE.SphereGeometry(1.5, 16, 12);
+    const material = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 1.0
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  // Update my location marker position
+  function updateMyLocationMarker() {
+    if (!myLocationMarker || !myLocation) return;
+
+    const pos = latLngToVector3(myLocation.lat, myLocation.lng, GLOBE_RADIUS * 1.03);
+    myLocationMarker.position.copy(pos);
+    myLocationMarker.visible = true;
+  }
+
   // Public API
   return {
     init: function(containerId) {
@@ -172,6 +193,11 @@ const Globe = (function() {
       // Create instanced peer points
       peerPoints = createPeerPoints(MAX_VISIBLE_PEERS);
       scene.add(peerPoints);
+
+      // Create my location marker
+      myLocationMarker = createMyLocationMarker();
+      myLocationMarker.visible = false;
+      scene.add(myLocationMarker);
 
       // Add ambient light
       const light = new THREE.AmbientLight(0xffffff, 1.0);
@@ -226,6 +252,9 @@ const Globe = (function() {
 
     setMyLocation: function(lat, lng) {
       myLocation = { lat, lng };
+      if (isInitialized && myLocationMarker) {
+        updateMyLocationMarker();
+      }
     },
 
     destroy: function() {
@@ -265,6 +294,11 @@ const Globe = (function() {
         peerPoints.geometry.dispose();
         peerPoints.material.dispose();
         peerPoints = null;
+      }
+      if (myLocationMarker) {
+        myLocationMarker.geometry.dispose();
+        myLocationMarker.material.dispose();
+        myLocationMarker = null;
       }
       if (renderer) {
         renderer.dispose();
