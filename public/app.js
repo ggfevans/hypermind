@@ -122,6 +122,7 @@ let ipCache = {}; // ip -> { lat, lon }
 let lastPeerData = [];
 let myLocation = null;
 let globeViewActive = false;
+let mapOpen = false;
 
 const fetchMyLocation = async () => {
   if (myLocation) return;
