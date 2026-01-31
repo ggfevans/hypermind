@@ -84,6 +84,45 @@ const Globe = (function() {
     return group;
   }
 
+  // Create instanced mesh for peer points (optimized for thousands of points)
+  function createPeerPoints(maxCount) {
+    const geometry = new THREE.SphereGeometry(0.8, 8, 6);
+    const peerColor = getThemeColor('--color-particle');
+    const material = new THREE.MeshBasicMaterial({
+      color: peerColor,
+      transparent: true,
+      opacity: 0.8
+    });
+
+    const mesh = new THREE.InstancedMesh(geometry, material, maxCount);
+    mesh.count = 0; // Start with no visible instances
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    return mesh;
+  }
+
+  // Update peer point positions
+  function updatePeerPointPositions() {
+    if (!peerPoints || peerData.length === 0) return;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    let visibleCount = 0;
+
+    for (let i = 0; i < peerData.length && i < MAX_VISIBLE_PEERS; i++) {
+      const peer = peerData[i];
+      if (peer.lat === undefined || peer.lng === undefined) continue;
+
+      position.copy(latLngToVector3(peer.lat, peer.lng, GLOBE_RADIUS * 1.02));
+      matrix.setPosition(position);
+      peerPoints.setMatrixAt(visibleCount, matrix);
+      visibleCount++;
+    }
+
+    peerPoints.count = visibleCount;
+    peerPoints.instanceMatrix.needsUpdate = true;
+  }
+
   // Public API
   return {
     init: function(containerId) {
@@ -130,6 +169,10 @@ const Globe = (function() {
       graticule = createGraticule(GLOBE_RADIUS * 1.001);
       scene.add(graticule);
 
+      // Create instanced peer points
+      peerPoints = createPeerPoints(MAX_VISIBLE_PEERS);
+      scene.add(peerPoints);
+
       // Add ambient light
       const light = new THREE.AmbientLight(0xffffff, 1.0);
       scene.add(light);
@@ -168,7 +211,17 @@ const Globe = (function() {
     },
 
     updatePeers: function(peers) {
-      peerData = peers;
+      // Filter to peers with valid coordinates
+      peerData = peers.filter(p =>
+        p.lat !== undefined &&
+        p.lng !== undefined &&
+        !isNaN(p.lat) &&
+        !isNaN(p.lng)
+      );
+
+      if (isInitialized && peerPoints) {
+        updatePeerPointPositions();
+      }
     },
 
     setMyLocation: function(lat, lng) {
@@ -207,6 +260,11 @@ const Globe = (function() {
           if (child.material) child.material.dispose();
         });
         graticule = null;
+      }
+      if (peerPoints) {
+        peerPoints.geometry.dispose();
+        peerPoints.material.dispose();
+        peerPoints = null;
       }
       if (renderer) {
         renderer.dispose();
