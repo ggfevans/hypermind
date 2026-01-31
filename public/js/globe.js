@@ -136,8 +136,10 @@ const Globe = (function() {
 
       // Animation loop
       let isHovering = false;
-      container.addEventListener('mouseenter', () => { isHovering = true; });
-      container.addEventListener('mouseleave', () => { isHovering = false; });
+      this._mouseEnterHandler = () => { isHovering = true; };
+      this._mouseLeaveHandler = () => { isHovering = false; };
+      container.addEventListener('mouseenter', this._mouseEnterHandler);
+      container.addEventListener('mouseleave', this._mouseLeaveHandler);
 
       function animate() {
         animationId = requestAnimationFrame(animate);
@@ -181,6 +183,14 @@ const Globe = (function() {
       if (this._resizeHandler) {
         window.removeEventListener('resize', this._resizeHandler);
         this._resizeHandler = null;
+      }
+      if (this._mouseEnterHandler && container) {
+        container.removeEventListener('mouseenter', this._mouseEnterHandler);
+        this._mouseEnterHandler = null;
+      }
+      if (this._mouseLeaveHandler && container) {
+        container.removeEventListener('mouseleave', this._mouseLeaveHandler);
+        this._mouseLeaveHandler = null;
       }
       if (controls) {
         controls.dispose();
