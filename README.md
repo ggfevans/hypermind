@@ -54,6 +54,26 @@ A completely decentralized chat system built directly on top of the swarm topolo
 *   **Themes:** Built-in theme switcher (Hypermind, Hypermind Classic, Nord, Solarized, Tokyo Night, etc).<br>
     <img src="assets/images/hypermind-theme.png" width="100" alt="Hypermind" /> <img src="assets/images/hypermind-classic-theme.png" width="100" alt="Hypermind Classic" /> <img src="assets/images/nord-dark-theme.png" width="100" alt="Nord" /> <img src="assets/images/solarized-light-theme.png" width="100" alt="Solarized" /> <img src="assets/images/tokyo-night-theme.png" width="100" alt="Tokyo Night" /> <img src="assets/images/volcano-theme.png" width="100" alt="Volcano" /> <img src="assets/images/catppuccin-mocha-theme.png" width="100" alt="Catppuccin Mocha" /> <img src="assets/images/catppuccin-latte-theme.png" width="100" alt="Catppuccin Latte" />
 
+## 3D Globe Visualization
+
+The map modal includes an optional 3D globe view for visualizing peer locations.
+
+### Features
+- WebGL-powered wireframe globe
+- Instanced rendering for up to 5,000 peers
+- Auto-rotation with mouse interaction
+- Theme-aware colors
+- Your location marker
+
+### Usage
+1. Click "map" to open the location modal
+2. Click "3D Globe" button to switch to globe view
+3. Drag to rotate, scroll to zoom
+4. Click "2D Map" to return to Leaflet map
+
+### Environment Variables
+- `ENABLE_GLOBE=true` - Enable the globe feature (default: false)
+
 ---
 
 ## Usage
