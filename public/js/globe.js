@@ -144,6 +144,35 @@ const Globe = (function() {
     myLocationMarker.visible = true;
   }
 
+  // Update colors when theme changes
+  function updateThemeColors() {
+    if (!isInitialized) return;
+
+    // Update scene background
+    const bgColor = getThemeColor('--color-bg-main') || '#191716';
+    scene.background = new THREE.Color(bgColor);
+
+    // Update wireframe color
+    const wireColor = getThemeColor('--color-particle');
+    if (globe && globe.material) {
+      globe.material.color.set(wireColor);
+    }
+
+    // Update graticule color
+    if (graticule) {
+      graticule.traverse((child) => {
+        if (child.material) {
+          child.material.color.set(wireColor);
+        }
+      });
+    }
+
+    // Update peer points color
+    if (peerPoints && peerPoints.material) {
+      peerPoints.material.color.set(wireColor);
+    }
+  }
+
   // Public API
   return {
     init: function(containerId) {
@@ -232,6 +261,23 @@ const Globe = (function() {
       // Store cleanup reference
       this._resizeHandler = handleResize;
 
+      // Watch for theme changes (stylesheet swap)
+      const themeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList' || mutation.attributeName === 'href') {
+            setTimeout(updateThemeColors, 100); // Small delay for CSS to apply
+          }
+        });
+      });
+
+      const themeLink = document.getElementById('theme-css');
+      if (themeLink) {
+        themeObserver.observe(themeLink, { attributes: true });
+      }
+      themeObserver.observe(document.head, { childList: true });
+
+      this._themeObserver = themeObserver;
+
       isInitialized = true;
       console.log('[Globe] Initialized successfully');
     },
@@ -274,6 +320,10 @@ const Globe = (function() {
         container.removeEventListener('mouseleave', this._mouseLeaveHandler);
         this._mouseLeaveHandler = null;
       }
+      if (this._themeObserver) {
+        this._themeObserver.disconnect();
+        this._themeObserver = null;
+      }
       if (controls) {
         controls.dispose();
         controls = null;
@@ -312,6 +362,10 @@ const Globe = (function() {
       container = null;
       isInitialized = false;
       console.log('[Globe] Destroyed');
+    },
+
+    updateTheme: function() {
+      updateThemeColors();
     },
 
     isReady: function() {
