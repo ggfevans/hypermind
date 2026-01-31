@@ -163,9 +163,29 @@ const openMap = () => {
   }
 };
 
-const closeMap = () => {
-  document.getElementById("mapModal").classList.remove("active");
-};
+function closeMap() {
+  const modal = document.getElementById("mapModal");
+  modal.classList.remove("active");
+  mapOpen = false;
+
+  // Clean up globe if it was active
+  if (globeViewActive && Globe.isReady()) {
+    Globe.destroy();
+  }
+  globeViewActive = false;
+
+  // Reset toggle button text for next open
+  const toggleBtn = document.querySelector('#map-view-toggle button');
+  if (toggleBtn) {
+    toggleBtn.textContent = '3D Globe';
+  }
+
+  // Reset display states
+  const mapDiv = document.getElementById('map');
+  const globeDiv = document.getElementById('globe-container');
+  if (mapDiv) mapDiv.style.display = 'block';
+  if (globeDiv) globeDiv.style.display = 'none';
+}
 
 function toggleGlobeView() {
   globeViewActive = !globeViewActive;
