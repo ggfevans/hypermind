@@ -111,6 +111,17 @@ const Globe = (function() {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(renderer.domElement);
 
+      // Create orbit controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.rotateSpeed = 0.5;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.5;
+      controls.minDistance = 150;
+      controls.maxDistance = 500;
+      controls.enablePan = false;
+
       // Create wireframe globe
       globe = createWireframeSphere(GLOBE_RADIUS);
       scene.add(globe);
@@ -123,14 +134,32 @@ const Globe = (function() {
       const light = new THREE.AmbientLight(0xffffff, 1.0);
       scene.add(light);
 
-      // Simple auto-rotation animation
+      // Animation loop
+      let isHovering = false;
+      container.addEventListener('mouseenter', () => { isHovering = true; });
+      container.addEventListener('mouseleave', () => { isHovering = false; });
+
       function animate() {
         animationId = requestAnimationFrame(animate);
-        globe.rotation.y += 0.002;
-        graticule.rotation.y = globe.rotation.y;
+        controls.autoRotate = !isHovering;
+        controls.update();
         renderer.render(scene, camera);
       }
       animate();
+
+      // Handle resize
+      function handleResize() {
+        if (!container) return;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+      window.addEventListener('resize', handleResize);
+
+      // Store cleanup reference
+      this._resizeHandler = handleResize;
 
       isInitialized = true;
       console.log('[Globe] Initialized successfully');
@@ -148,6 +177,14 @@ const Globe = (function() {
       if (animationId) {
         cancelAnimationFrame(animationId);
         animationId = null;
+      }
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler);
+        this._resizeHandler = null;
+      }
+      if (controls) {
+        controls.dispose();
+        controls = null;
       }
       if (globe) {
         globe.geometry.dispose();
