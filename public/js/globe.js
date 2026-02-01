@@ -42,11 +42,176 @@ const Globe = (function() {
   let cachedSyntheticPeers = [];
   let lastSyntheticCount = 0;
 
+  // GeoJSON land data for accurate boundaries
+  let landPolygons = [];
+  let geoDataLoaded = false;
+
   // Get theme colors from CSS variables
   function getThemeColor(varName) {
     const style = getComputedStyle(document.documentElement);
     const color = style.getPropertyValue(varName).trim();
     return color || '#718062';
+  }
+
+  // Load GeoJSON land boundaries
+  async function loadGeoData() {
+    if (geoDataLoaded) return;
+    try {
+      const response = await fetch('/data/land.geojson');
+      const geojson = await response.json();
+      landPolygons = [];
+
+      for (const feature of geojson.features) {
+        if (feature.geometry.type === 'Polygon') {
+          landPolygons.push(feature.geometry.coordinates[0]);
+        } else if (feature.geometry.type === 'MultiPolygon') {
+          for (const poly of feature.geometry.coordinates) {
+            landPolygons.push(poly[0]);
+          }
+        }
+      }
+      geoDataLoaded = true;
+      console.log('[Globe] Loaded', landPolygons.length, 'land polygons');
+
+      // Build sample points for efficient random land point generation
+      buildLandSamplePoints();
+
+      // Clear cache so points get regenerated with proper land constraints
+      cachedSyntheticPeers = [];
+      lastSyntheticCount = 0;
+
+      // Trigger re-render if we have peer data
+      if (peerData.length > 0) {
+        updatePeerPointPositions();
+        updateConnectionLines();
+      }
+    } catch (e) {
+      console.error('[Globe] Failed to load GeoJSON:', e);
+    }
+  }
+
+  // Point-in-polygon test (ray casting algorithm)
+  function pointInPolygon(lat, lng, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+
+      if (((yi > lat) !== (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  // Check if point is on land
+  function isOnLand(lat, lng) {
+    if (!geoDataLoaded || landPolygons.length === 0) return true; // Allow if no data
+    for (const polygon of landPolygons) {
+      if (pointInPolygon(lat, lng, polygon)) return true;
+    }
+    return false;
+  }
+
+  // Pre-computed land sample points (generated once from GeoJSON centroids)
+  let landSamplePoints = [];
+
+  // Build sample points from polygon centroids
+  function buildLandSamplePoints() {
+    if (landSamplePoints.length > 0 || !geoDataLoaded) return;
+
+    for (const polygon of landPolygons) {
+      if (polygon.length < 4) continue;
+
+      // Calculate centroid
+      let sumLng = 0, sumLat = 0;
+      for (const [lng, lat] of polygon) {
+        sumLng += lng;
+        sumLat += lat;
+      }
+      const centLng = sumLng / polygon.length;
+      const centLat = sumLat / polygon.length;
+
+      // Add centroid and some random points inside polygon
+      if (isOnLand(centLat, centLng)) {
+        landSamplePoints.push({ lat: centLat, lng: centLng });
+      }
+
+      // Add random samples within polygon bounding box
+      let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+      for (const [lng, lat] of polygon) {
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      }
+
+      // Add a few samples per polygon
+      for (let i = 0; i < 5; i++) {
+        const lat = minLat + Math.random() * (maxLat - minLat);
+        const lng = minLng + Math.random() * (maxLng - minLng);
+        if (isOnLand(lat, lng)) {
+          landSamplePoints.push({ lat, lng });
+        }
+      }
+    }
+
+    console.log('[Globe] Built', landSamplePoints.length, 'land sample points');
+  }
+
+  // Generate random point on land
+  function randomLandPoint() {
+    // If we have sample points, pick one and add jitter
+    if (landSamplePoints.length > 0) {
+      const sample = landSamplePoints[Math.floor(Math.random() * landSamplePoints.length)];
+      // Add small jitter (±2°) and verify still on land
+      for (let i = 0; i < 10; i++) {
+        const lat = sample.lat + (Math.random() - 0.5) * 4;
+        const lng = sample.lng + (Math.random() - 0.5) * 4;
+        if (isOnLand(lat, lng)) {
+          return { lat, lng };
+        }
+      }
+      // Return sample point without jitter
+      return { lat: sample.lat, lng: sample.lng };
+    }
+
+    // Fallback: try random points in land regions
+    for (let i = 0; i < 100; i++) {
+      const regions = [
+        { minLat: 25, maxLat: 60, minLng: -130, maxLng: -60, weight: 0.15 },
+        { minLat: 35, maxLat: 70, minLng: -10, maxLng: 60, weight: 0.25 },
+        { minLat: 5, maxLat: 55, minLng: 70, maxLng: 145, weight: 0.35 },
+        { minLat: -35, maxLat: 35, minLng: -20, maxLng: 55, weight: 0.10 },
+        { minLat: -55, maxLat: 15, minLng: -80, maxLng: -35, weight: 0.08 },
+        { minLat: -45, maxLat: -10, minLng: 110, maxLng: 155, weight: 0.07 },
+      ];
+
+      let r = Math.random();
+      let region = regions[0];
+      for (const reg of regions) {
+        r -= reg.weight;
+        if (r <= 0) { region = reg; break; }
+      }
+
+      const lat = region.minLat + Math.random() * (region.maxLat - region.minLat);
+      const lng = region.minLng + Math.random() * (region.maxLng - region.minLng);
+
+      if (isOnLand(lat, lng)) {
+        return { lat, lng };
+      }
+    }
+
+    // Last resort: known land coordinates
+    const knownLand = [
+      { lat: 40, lng: -74 },   // New York
+      { lat: 51, lng: 0 },     // London
+      { lat: 35, lng: 139 },   // Tokyo
+      { lat: 39, lng: 116 },   // Beijing
+      { lat: -34, lng: 151 },  // Sydney
+    ];
+    return knownLand[Math.floor(Math.random() * knownLand.length)];
   }
 
   // Convert lat/lng to 3D position on sphere
@@ -73,38 +238,39 @@ const Globe = (function() {
     return new THREE.Mesh(geometry, material);
   }
 
-  // Simplified continent outlines (major coastlines)
-  const CONTINENT_PATHS = [
-    // North America
-    [[70,-170],[65,-168],[60,-165],[55,-165],[50,-130],[48,-125],[40,-124],[35,-120],[30,-118],[25,-110],[20,-105],[18,-97],[20,-90],[25,-82],[30,-82],[28,-80],[25,-80],[27,-82],[30,-85],[25,-90],[20,-87],[22,-98],[28,-96],[30,-93],[26,-82],[30,-81],[32,-80],[35,-75],[40,-74],[42,-70],[44,-67],[45,-64],[47,-60],[50,-57],[53,-56],[55,-60],[60,-65],[65,-62],[70,-75],[72,-95],[71,-130],[72,-160],[70,-170]],
-    // South America
-    [[12,-72],[10,-76],[5,-77],[0,-80],[-5,-81],[-10,-78],[-15,-75],[-20,-70],[-25,-70],[-30,-72],[-35,-72],[-40,-73],[-45,-75],[-50,-74],[-55,-68],[-55,-65],[-52,-58],[-48,-65],[-42,-63],[-38,-57],[-35,-53],[-30,-50],[-25,-47],[-20,-40],[-15,-39],[-10,-37],[-5,-35],[0,-50],[5,-60],[10,-72],[12,-72]],
-    // Europe
-    [[70,30],[68,25],[65,25],[60,30],[58,25],[55,20],[50,5],[48,0],[43,-9],[36,-8],[36,-5],[38,0],[42,3],[43,8],[45,13],[42,18],[40,25],[38,28],[36,28],[35,25],[37,35],[40,30],[45,30],[48,35],[50,30],[55,35],[60,30],[65,30],[70,30]],
-    // Africa
-    [[35,-5],[37,10],[33,12],[32,32],[30,33],[25,35],[20,38],[15,42],[10,45],[5,42],[0,42],[-5,40],[-10,40],[-15,38],[-20,35],[-25,35],[-30,30],[-35,20],[-34,18],[-30,17],[-25,15],[-20,12],[-15,12],[-10,15],[-5,10],[0,10],[5,5],[10,0],[15,-17],[20,-17],[25,-15],[28,-10],[32,-8],[35,-5]],
-    // Asia (simplified)
-    [[70,180],[65,180],[60,165],[55,160],[50,155],[45,145],[40,140],[35,140],[35,135],[30,130],[25,120],[22,115],[20,110],[10,105],[5,100],[0,105],[-8,115],[-8,120],[0,130],[5,125],[10,120],[15,110],[20,110],[25,122],[30,122],[35,128],[40,125],[45,135],[50,140],[55,140],[60,145],[65,160],[70,180]],
-    // Australia
-    [[-12,130],[-15,125],[-20,118],[-25,113],[-30,115],[-35,117],[-38,145],[-35,150],[-30,153],[-25,153],[-20,148],[-15,145],[-12,142],[-10,142],[-12,135],[-12,130]]
-  ];
-
-  // Create continent outlines using tubes for visibility
-  function createContinents(radius) {
+  // Create continent outlines from GeoJSON data
+  function createContinentsFromGeoJSON(radius) {
     const lineColor = getThemeColor('--color-particle');
     const material = new THREE.MeshBasicMaterial({
       color: lineColor,
       transparent: true,
-      opacity: 1.0
+      opacity: 0.6  // Lower opacity for outline-only look
     });
 
     const group = new THREE.Group();
 
-    for (const path of CONTINENT_PATHS) {
-      const points = path.map(([lat, lng]) => latLngToVector3(lat, lng, radius));
-      const curve = new THREE.CatmullRomCurve3(points, false);
-      const tubeGeometry = new THREE.TubeGeometry(curve, path.length * 2, 0.3, 4, false);
-      group.add(new THREE.Mesh(tubeGeometry, material));
+    // Only render polygons with enough points for visible coastlines
+    for (const polygon of landPolygons) {
+      if (polygon.length < 10) continue; // Skip tiny islands
+
+      // Simplify: take every Nth point for performance
+      const step = Math.max(1, Math.floor(polygon.length / 100));
+      const points = [];
+      for (let i = 0; i < polygon.length; i += step) {
+        const [lng, lat] = polygon[i]; // GeoJSON is [lng, lat]
+        points.push(latLngToVector3(lat, lng, radius));
+      }
+
+      if (points.length < 4) continue;
+
+      try {
+        const curve = new THREE.CatmullRomCurve3(points, true); // closed loop
+        // 2x thicker lines (0.5 radius)
+        const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, 0.5, 6, true);
+        group.add(new THREE.Mesh(tubeGeometry, material));
+      } catch (e) {
+        // Skip problematic polygons
+      }
     }
 
     group.userData.sharedMaterial = material;
@@ -149,12 +315,13 @@ const Globe = (function() {
 
   // Create instanced mesh for peer points (optimized for thousands of points)
   function createPeerPoints(maxCount) {
-    const geometry = new THREE.SphereGeometry(0.3, 6, 4); // Smaller points
-    const peerColor = getThemeColor('--color-particle');
+    const geometry = new THREE.SphereGeometry(0.35, 6, 4);
+    // Use accent color (count color) for contrast against continent lines
+    const peerColor = getThemeColor('--color-count') || '#ffffff';
     const material = new THREE.MeshBasicMaterial({
       color: peerColor,
       transparent: true,
-      opacity: 0.7
+      opacity: 0.9
     });
 
     const mesh = new THREE.InstancedMesh(geometry, material, maxCount);
@@ -308,9 +475,10 @@ const Globe = (function() {
       });
     }
 
-    // Update peer points color
+    // Update peer points color (use accent color for contrast)
+    const accentColor = getThemeColor('--color-count') || '#ffffff';
     if (peerPoints && peerPoints.material) {
-      peerPoints.material.color.set(wireColor);
+      peerPoints.material.color.set(accentColor);
     }
 
     // Update connection lines color
@@ -319,7 +487,7 @@ const Globe = (function() {
     }
   }
 
-  // Generate synthetic peers distributed on land masses (cached for stability)
+  // Generate synthetic peers constrained to land (cached for stability)
   function generateSyntheticPeers(geolocatedPeers, totalCount) {
     if (totalCount <= geolocatedPeers.length) {
       return geolocatedPeers;
@@ -332,34 +500,12 @@ const Globe = (function() {
       return [...geolocatedPeers, ...cachedSyntheticPeers.slice(0, syntheticCount)];
     }
 
-    // Need more peers - extend the cache (don't regenerate existing ones)
+    // Need more peers - extend the cache using land-constrained points
     const startIndex = cachedSyntheticPeers.length;
 
-    // Land mass bounding boxes (lat/lng ranges)
-    const landRegions = [
-      { minLat: 25, maxLat: 70, minLng: -130, maxLng: -60, weight: 0.15 },   // North America
-      { minLat: -55, maxLat: 12, minLng: -80, maxLng: -35, weight: 0.08 },   // South America
-      { minLat: 35, maxLat: 70, minLng: -10, maxLng: 40, weight: 0.18 },     // Europe
-      { minLat: -35, maxLat: 35, minLng: -20, maxLng: 50, weight: 0.12 },    // Africa
-      { minLat: 10, maxLat: 55, minLng: 60, maxLng: 140, weight: 0.30 },     // Asia
-      { minLat: -45, maxLat: -10, minLng: 110, maxLng: 155, weight: 0.08 },  // Australia
-      { minLat: 50, maxLat: 70, minLng: 60, maxLng: 180, weight: 0.09 },     // Russia/Siberia
-    ];
-
     for (let i = startIndex; i < syntheticCount; i++) {
-      // Pick weighted random region
-      let r = Math.random();
-      let region = landRegions[0];
-      for (const reg of landRegions) {
-        r -= reg.weight;
-        if (r <= 0) { region = reg; break; }
-      }
-
-      // Random position within land region bounds
-      const lat = region.minLat + Math.random() * (region.maxLat - region.minLat);
-      const lng = region.minLng + Math.random() * (region.maxLng - region.minLng);
-
-      cachedSyntheticPeers.push({ id: `synthetic-${i}`, lat, lng });
+      const point = randomLandPoint();
+      cachedSyntheticPeers.push({ id: `synthetic-${i}`, lat: point.lat, lng: point.lng });
     }
 
     return [...geolocatedPeers, ...cachedSyntheticPeers.slice(0, syntheticCount)];
@@ -426,9 +572,13 @@ const Globe = (function() {
       graticule = createGraticule(GLOBE_RADIUS * 1.001);
       scene.add(graticule);
 
-      // Create continent outlines
-      continents = createContinents(GLOBE_RADIUS * 1.002);
-      scene.add(continents);
+      // Load GeoJSON and create continent outlines (async)
+      loadGeoData().then(() => {
+        if (geoDataLoaded && scene) {
+          continents = createContinentsFromGeoJSON(GLOBE_RADIUS * 1.002);
+          scene.add(continents);
+        }
+      });
 
       // Create instanced peer points
       peerPoints = createPeerPoints(MAX_VISIBLE_PEERS);
