@@ -12,7 +12,7 @@
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=palette"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=palette,public"
     />
     <script>
       (function () {
@@ -50,7 +50,8 @@
       </div>
     </div>
 
-    <canvas id="network" data-visual-limit="{{VISUAL_LIMIT}}"></canvas>
+    <canvas id="network" data-visual-limit="{{VISUAL_LIMIT}}" style="display: none;"></canvas>
+    <div id="globe-background"></div>
     <div class="container">
       <div id="count" class="count" data-initial-count="{{COUNT}}">
         {{COUNT}}
@@ -185,6 +186,15 @@
       </div>
     </div>
 
+    <button
+      id="globe-toggle"
+      class="theme-btn"
+      style="left: 4rem;"
+      title="Toggle Globe Background"
+      onclick="toggleGlobeBackground()"
+    >
+      <span class="material-symbols-outlined">public</span>
+    </button>
     <button
       id="theme-switcher"
       class="theme-btn {{THEMES_CLASS}}"

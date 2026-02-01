@@ -120,9 +120,11 @@ let mapInitialized = false;
 let peerMarkers = {}; // id -> marker
 let ipCache = {}; // ip -> { lat, lon }
 let lastPeerData = [];
+let lastTotalCount = 0;
 let myLocation = null;
 let globeViewActive = false;
 let mapOpen = false;
+let globeBackgroundActive = false;
 
 const fetchMyLocation = async () => {
   if (myLocation) return;
@@ -136,8 +138,8 @@ const fetchMyLocation = async () => {
         city: data.city,
         country: data.country,
       };
-      // Update globe if active
-      if (globeViewActive && Globe.isReady()) {
+      // Update globe if active (background or modal)
+      if (Globe && Globe.isReady()) {
         Globe.setMyLocation(myLocation.lat, myLocation.lon);
       }
       updateMap(lastPeerData);
@@ -211,7 +213,12 @@ function toggleGlobeView() {
 
     // Transfer current peer data to globe
     if (lastPeerData) {
-      Globe.updatePeers(lastPeerData);
+      const globePeers = lastPeerData.map(p => ({
+        id: p.id,
+        lat: ipCache[p.ip]?.lat,
+        lng: ipCache[p.ip]?.lon
+      })).filter(p => p.lat && p.lng);
+      Globe.updatePeers(globePeers, lastTotalCount);
     }
     if (myLocation && myLocation.lat && myLocation.lon) {
       Globe.setMyLocation(myLocation.lat, myLocation.lon);
@@ -330,9 +337,14 @@ const updateMap = async (peers) => {
     lng: ipCache[p.ip]?.lon
   })).filter(p => p.lat && p.lng);
 
-  // Update globe if active
+  // Update globe if active (modal view)
   if (globeViewActive && Globe.isReady()) {
-    Globe.updatePeers(lastPeerData);
+    const globePeers = lastPeerData.map(p => ({
+      id: p.id,
+      lat: ipCache[p.ip]?.lat,
+      lng: ipCache[p.ip]?.lon
+    })).filter(p => p.lat && p.lng);
+    Globe.updatePeers(globePeers, lastTotalCount);
   }
 
   // Add My Location
@@ -843,11 +855,41 @@ evtSource.onmessage = (event) => {
 
   if (data.peers) {
     lastPeerData = data.peers;
+    lastTotalCount = data.count || 0;
+
     if (
       mapInitialized &&
       document.getElementById("mapModal").classList.contains("active")
     ) {
       updateMap(data.peers);
+    }
+
+    // Update background globe with peer data
+    if (globeBackgroundActive && Globe && Globe.isReady()) {
+      // Convert peer data format for globe (needs lat/lng from IP cache)
+      const globePeers = data.peers.map(p => ({
+        id: p.id,
+        lat: ipCache[p.ip]?.lat,
+        lng: ipCache[p.ip]?.lon
+      })).filter(p => p.lat && p.lng);
+
+      // Also try to fetch locations for peers we don't have yet
+      data.peers.forEach(async (peer) => {
+        if (peer.ip && !ipCache[peer.ip]) {
+          const loc = await fetchLocation(peer.ip);
+          if (loc && globeBackgroundActive && Globe.isReady()) {
+            // Re-update globe with new location data
+            const updatedPeers = lastPeerData.map(p => ({
+              id: p.id,
+              lat: ipCache[p.ip]?.lat,
+              lng: ipCache[p.ip]?.lon
+            })).filter(p => p.lat && p.lng);
+            Globe.updatePeers(updatedPeers, lastTotalCount);
+          }
+        }
+      });
+
+      Globe.updatePeers(globePeers, lastTotalCount);
     }
   }
 
@@ -917,6 +959,66 @@ countEl.innerText = initialCount;
 countEl.classList.add("loaded");
 updateParticles(initialCount);
 animate();
+
+// Toggle between particle canvas and globe background
+function toggleGlobeBackground() {
+  if (typeof Globe === 'undefined') {
+    console.log('[Globe Background] Globe module not loaded');
+    return;
+  }
+
+  const particleCanvas = document.getElementById('network');
+  const globeBg = document.getElementById('globe-background');
+
+  if (!globeBg) {
+    console.log('[Globe Background] Container not found');
+    return;
+  }
+
+  globeBackgroundActive = !globeBackgroundActive;
+
+  if (globeBackgroundActive) {
+    // Switch to globe
+    if (particleCanvas) particleCanvas.style.display = 'none';
+    globeBg.style.display = 'block';
+
+    if (!Globe.isReady()) {
+      Globe.init('globe-background', { background: true });
+      fetchMyLocation();
+    }
+
+    // Feed current peer data to globe
+    if (lastPeerData.length > 0) {
+      const globePeers = lastPeerData.map(p => ({
+        id: p.id,
+        lat: ipCache[p.ip]?.lat,
+        lng: ipCache[p.ip]?.lon
+      })).filter(p => p.lat && p.lng);
+      Globe.updatePeers(globePeers, lastTotalCount);
+    }
+
+    console.log('[Globe Background] Activated');
+  } else {
+    // Switch back to particles
+    if (particleCanvas) particleCanvas.style.display = 'block';
+    globeBg.style.display = 'none';
+
+    if (Globe.isReady()) {
+      Globe.destroy();
+    }
+
+    console.log('[Globe Background] Deactivated');
+  }
+}
+
+window.toggleGlobeBackground = toggleGlobeBackground;
+
+// Auto-activate globe background if globe is available (cyberpunk default)
+setTimeout(() => {
+  if (typeof Globe !== 'undefined' && document.getElementById('globe-background')) {
+    toggleGlobeBackground(); // Start with globe active
+  }
+}, 100);
 
 const bandwidthHistory = { timestamps: [], bytesIn: [], bytesOut: [] };
 let selectedTimeRange = 300;
