@@ -30,6 +30,7 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "hyperswarm": "^4.16.0"
+    "hyperswarm": "^4.16.0",
+    "three": "^0.150.0"
   }
 }
