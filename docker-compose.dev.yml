@@ -3,7 +3,11 @@ services:
     build: .
     image: hypermind
     container_name: hypermind
-    network_mode: host
+    #network_mode: host
+    ports:
+      - "3000:3000"
     restart: unless-stopped
     environment:
       - PORT=3000
+      - ENABLE_CHAT=true
+      - ENABLE_MAP=true

@@ -32,6 +32,14 @@
 
 ![Catppuccin latte theme screenshot](assets/images/catppuccin-latte-theme.png)
 
+### Dracula
+
+![Dracula theme screenshot](assets/images/dracula-theme.png)
+
+### Alucard
+
+![Dracula Light theme screenshot](assets/images/dracula-light-theme.png)
+
 # Contributing custom themes
 
 1. Fork `main` and clone locally to your device.
@@ -50,6 +58,8 @@
         'volcano.css',
         'catppuccin-mocha.css',
         'catppuccin-latte.css',
+        'dracula.css',
+        'dracula-light.css',
         'new-theme.css' // always add to the end of the list
     ];
    ```

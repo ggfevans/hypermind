@@ -1158,6 +1158,8 @@ const themes = [
   "volcano.css",
   "catppuccin-mocha.css",
   "catppuccin-latte.css",
+  "dracula.css",
+  "dracula-light.css",
 ];
 
 let currentThemeIndex = 0;
